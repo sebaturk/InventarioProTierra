@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stock — Control de inventario</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Lógica de negocio: pantallas, login por PIN, conteos, aprobaciones.
+     Se carga como script clásico para que sus funciones queden accesibles
+     desde los onclick="..." que arma dinámicamente. -->
+<script src="js/app.js"></script>
+
+<!-- Conexión con Firebase (Firestore + Storage + Auth anónima). -->
+<script type="module" src="js/firebase-adapter.js"></script>
+
+<!-- Arranca la app una vez que Firebase está listo. -->
+<script type="module">
+  // Espera a que firebase-adapter.js haya corrido y dejado window.__firebaseReady listo.
+  // Como ambos son scripts type="module", el navegador los ejecuta en orden después
+  // de parsear el HTML, así que para cuando llega acá ya existe.
+  init();
+</script>
+</body>
+</html>

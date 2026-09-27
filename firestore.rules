@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// Regla simple para un uso interno de bajo riesgo: cualquiera que haya
+// iniciado sesión de forma anónima en la app (paso automático al abrir la
+// página) puede leer y escribir. El PIN dentro de la app identifica QUIÉN
+// es la persona a nivel de uso, pero no es lo que protege la base de datos:
+// eso lo hace esta regla. No es un control de acceso por rol real (eso
+// requeriría autenticación por usuario + Cloud Functions), pero evita que
+// bots o scrapers que nunca abrieron la app puedan leer o escribir directo.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
