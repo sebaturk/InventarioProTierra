@@ -54,8 +54,10 @@
   }
   * { box-sizing: border-box; }
   html, body {
-    height: 100%;
+    min-height: 100%;
     margin: 0;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     background: var(--bg);
     color: var(--text-primary);
     font-family: var(--font);
@@ -66,7 +68,12 @@
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  #app { max-width: 480px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; }
+  #app {
+    width: 100%; max-width: 1040px; margin: 0 auto;
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column;
+  }
+  img { max-width: 100%; }
   .topbar {
     position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
     display: flex; align-items: center; justify-content: space-between;
@@ -79,7 +86,7 @@
   .topbar button.logout {
     background: none; border: none; color: var(--accent); font-size: 14px; padding: 6px 4px; cursor: pointer;
   }
-  main { flex: 1; padding: 20px; padding-bottom: 40px; }
+  main { flex: 1; min-width: 0; padding: clamp(16px, 3vw, 32px); padding-bottom: 48px; }
   h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
   h2 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }
   h3 { font-size: 16px; font-weight: 500; margin: 0 0 2px; }
@@ -102,7 +109,7 @@
   .row > * { flex: 1; }
   input[type=text], input[type=number], input[type=tel], textarea, select {
     width: 100%; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border);
-    background: var(--surface); color: var(--text-primary); font-size: 15px; font-family: var(--font);
+    background: var(--surface); color: var(--text-primary); font-size: 16px; font-family: var(--font);
   }
   label.field { display: block; font-size: 13px; color: var(--text-secondary); margin: 14px 0 6px; }
   label.field:first-child { margin-top: 0; }
@@ -114,7 +121,7 @@
   .badge-warn { background: var(--warning-bg); color: var(--warning); }
   .badge-danger { background: var(--danger-bg); color: var(--danger); }
   .badge-muted { background: var(--surface-2); color: var(--text-secondary); }
-  .pinpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 280px; margin: 0 auto; }
+  .pinpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(10px, 2.4vw, 18px); width: min(100%, 360px); margin: 0 auto; }
   .pinpad button {
     aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--border); background: var(--surface);
     font-size: 22px; color: var(--text-primary); cursor: pointer;
@@ -133,8 +140,8 @@
   .product-info { flex: 1; min-width: 0; }
   .product-info .pname { font-size: 15px; font-weight: 500; }
   .product-info .pmeta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-  .qty-input { width: 72px; text-align: center; padding: 10px 6px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 18px; overflow-x: auto; padding-bottom: 2px; }
+  input.qty-input { width: 76px; flex: 0 0 auto; text-align: center; padding: 10px 6px; }
+  .tabs { display: flex; gap: 6px; margin: 14px 0 18px; overflow-x: auto; padding-bottom: 2px; }
   .tab {
     padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; white-space: nowrap;
     background: var(--surface-2); color: var(--text-secondary); cursor: pointer; border: 1px solid transparent;
@@ -165,4 +172,53 @@
     border-top-color: var(--accent); animation: spin 0.8s linear infinite; margin: 0 auto;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .center-screen { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .center-screen { min-height: 100vh; min-height: 100dvh; width: 100%; padding: 24px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .center-screen .card { max-width: 440px; }
+ 
+  /* ---------- Responsive ---------- */
+  .pinpad button { font-size: clamp(22px, 5vw, 30px); }
+  .pindots .dot { width: 16px; height: 16px; }
+  .product-info, .list-item > div { min-width: 0; }
+  .product-info .pname { overflow-wrap: anywhere; }
+ 
+  .form-narrow { width: 100%; max-width: 560px; }
+  .form-narrow-main { width: 100%; max-width: 620px; margin: 0 auto; }
+  .content-narrow { width: 100%; max-width: 720px; }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .cards-grid .card { margin-bottom: 0; }
+  .product-grid .empty, .product-grid > p { grid-column: 1 / -1; }
+ 
+  /* Tablet */
+  @media (min-width: 640px) {
+    h1 { font-size: 26px; }
+    h2 { font-size: 20px; }
+    p.sub { font-size: 15px; }
+    .topbar { padding: 16px clamp(20px, 3vw, 32px); }
+    /* En pantallas anchas cada producto es su propia tarjeta (evita filas desalineadas) */
+    .card.product-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start;
+      background: transparent; border: none; padding: 0;
+    }
+    .card.product-grid .product-row,
+    .card.product-grid .product-row:last-child {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px;
+    }
+    input.qty-input { width: 88px; }
+  }
+ 
+  /* Desktop */
+  @media (min-width: 1024px) {
+    .card.product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tabs { flex-wrap: wrap; }
+  }
+ 
+  /* Pantallas muy chicas o celular horizontal */
+  @media (max-width: 360px) {
+    .product-row { gap: 8px; }
+    .thumb { width: 44px; height: 44px; }
+    input.qty-input { width: 64px; }
+  }
+  @media (max-height: 520px) {
+    .center-screen { min-height: auto; justify-content: flex-start; }
+    .pindots { margin: 12px 0; }
+  }
