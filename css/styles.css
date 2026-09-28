@@ -174,20 +174,20 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .center-screen { min-height: 100vh; min-height: 100dvh; width: 100%; padding: 24px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .center-screen .card { max-width: 440px; }
- 
+
   /* ---------- Responsive ---------- */
   .pinpad button { font-size: clamp(22px, 5vw, 30px); }
   .pindots .dot { width: 16px; height: 16px; }
   .product-info, .list-item > div { min-width: 0; }
   .product-info .pname { overflow-wrap: anywhere; }
- 
+
   .form-narrow { width: 100%; max-width: 560px; }
   .form-narrow-main { width: 100%; max-width: 620px; margin: 0 auto; }
   .content-narrow { width: 100%; max-width: 720px; }
   .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   .cards-grid .card { margin-bottom: 0; }
   .product-grid .empty, .product-grid > p { grid-column: 1 / -1; }
- 
+
   /* Tablet */
   @media (min-width: 640px) {
     h1 { font-size: 26px; }
@@ -205,13 +205,13 @@
     }
     input.qty-input { width: 88px; }
   }
- 
+
   /* Desktop */
   @media (min-width: 1024px) {
     .card.product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .tabs { flex-wrap: wrap; }
   }
- 
+
   /* Pantallas muy chicas o celular horizontal */
   @media (max-width: 360px) {
     .product-row { gap: 8px; }
@@ -222,3 +222,6 @@
     .center-screen { min-height: auto; justify-content: flex-start; }
     .pindots { margin: 12px 0; }
   }
+
+
+.puso { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
