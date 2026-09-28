@@ -2,7 +2,7 @@
 var AREAS = ['cocina','barra','piso'];
 var AREA_LABEL = { cocina: 'Cocina', barra: 'Barra', piso: 'Piso' };
 var MONTHS_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-
+ 
 var state = {
   ready: false,
   db: null,
@@ -16,7 +16,7 @@ var state = {
   localItems: {},    // productId -> {qty, reason}
   saveTimer: null
 };
-
+ 
 function el(html) {
   var d = document.createElement('div');
   d.innerHTML = html.trim();
@@ -42,7 +42,7 @@ function photoUrl(photoId) {
   if (!photoId) return '';
   return window.__firebasePhotoUrl(photoId);
 }
-
+ 
 // ---------- init ----------
 async function init() {
   try {
@@ -65,7 +65,7 @@ async function init() {
   }
   draw();
 }
-
+ 
 // ---------- PIN login ----------
 function drawLogin() {
   var dots = '';
@@ -96,22 +96,41 @@ function pinBackspace() {
 }
 async function attemptLogin() {
   var pin = state.pinBuffer;
+  var snap;
   try {
-    var snap = await state.db.collection('staff').where('pin','==',pin).where('active','==',true).limit(1).get();
-    if (snap.empty) {
-      document.getElementById('login-error').textContent = 'PIN incorrecto';
-      state.pinBuffer = '';
-      setTimeout(drawLogin, 400);
-      return;
-    }
-    var doc = snap.docs[0];
-    state.user = Object.assign({id: doc.id}, doc.data());
+    snap = await state.db.collection('staff').where('pin','==',pin).where('active','==',true).limit(1).get();
+  } catch (e) {
+    console.error('Error verificando PIN:', e);
+    showLoginError('Error de conexión (' + (e.code || e.message) + ')');
+    return;
+  }
+  if (snap.empty) {
+    document.getElementById('login-error').textContent = 'PIN incorrecto';
     state.pinBuffer = '';
-    state.screen = state.user.role === 'admin' ? 'admin' : 'area';
+    setTimeout(drawLogin, 400);
+    return;
+  }
+  var doc = snap.docs[0];
+  state.user = Object.assign({id: doc.id}, doc.data());
+  state.pinBuffer = '';
+  state.screen = state.user.role === 'admin' ? 'admin' : 'area';
+  try {
     await draw();
   } catch (e) {
-    document.getElementById('login-error').textContent = 'Error de conexión, probá de nuevo';
+    // El PIN era correcto; falló al cargar los datos de la pantalla.
+    console.error('Error cargando la pantalla:', e);
+    var code = (e.code || e.message || 'desconocido');
+    state.user = null;
+    state.screen = 'login';
+    drawLogin();
+    showLoginError('No se pudieron cargar los datos (' + code + ')');
   }
+}
+function showLoginError(msg) {
+  state.pinBuffer = '';
+  drawLogin();
+  var box = document.getElementById('login-error');
+  if (box) { box.textContent = msg; box.style.height = 'auto'; }
 }
 function logout() {
   state.user = null;
@@ -120,7 +139,7 @@ function logout() {
   state.screen = 'login';
   draw();
 }
-
+ 
 // ---------- bootstrap first admin ----------
 function drawBootstrap() {
   render(
@@ -145,14 +164,14 @@ async function createFirstAdmin() {
   state.screen = 'login';
   draw();
 }
-
+ 
 // ---------- topbar ----------
 function topbar() {
   if (!state.user) return '';
   var roleLabel = state.user.role === 'admin' ? 'Administrador' : AREA_LABEL[state.user.area] + ' · Encargado';
   return '<div class="topbar"><div class="who"><span class="name">'+esc(state.user.name)+'</span><span class="role">'+esc(roleLabel)+'</span></div><button class="logout" onclick="logout()">Salir</button></div>';
 }
-
+ 
 // ---------- AREA SCREEN ----------
 async function drawArea() {
   var area = state.user.area;
@@ -160,19 +179,23 @@ async function drawArea() {
   var countId = area + '_' + ym;
   var countRef = state.db.doc('counts/' + countId);
   var snap = await countRef.get();
-
+ 
   var prodSnap = await state.db.collection('products').where('area','==',area).where('status','==','approved').get();
   var products = prodSnap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
   products.sort(function(a,b){ return a.name.localeCompare(b.name); });
   state.products = products;
-
+ 
   if (!snap.exists) {
     // find last approved count for baseline
-    var prevSnap = await state.db.collection('counts').where('area','==',area).where('status','==','approved').orderBy('month','desc').limit(1).get();
+    // Sin orderBy en la consulta: Firestore exigiría un índice compuesto.
+    // Son pocos documentos por área, así que se ordena acá en el navegador.
+    var prevSnap = await state.db.collection('counts').where('area','==',area).where('status','==','approved').get();
     var baseline = {};
     if (!prevSnap.empty) {
-      var prevData = prevSnap.docs[0].data();
-      baseline = prevData.items || {};
+      var prevDocs = prevSnap.docs.map(function(d){ return d.data(); })
+        .filter(function(d){ return d.month !== ym; })
+        .sort(function(a,b){ return a.month < b.month ? 1 : (a.month > b.month ? -1 : 0); });
+      if (prevDocs.length) baseline = prevDocs[0].items || {};
     }
     var items = {};
     products.forEach(function(p){
@@ -183,12 +206,12 @@ async function drawArea() {
     await countRef.set(newDoc);
     snap = await countRef.get();
   }
-
+ 
   state.currentCount = Object.assign({id: countId}, snap.data());
   state.localItems = JSON.parse(JSON.stringify(state.currentCount.items || {}));
   renderAreaScreen();
 }
-
+ 
 function renderAreaScreen() {
   var c = state.currentCount;
   var ym = currentYm();
@@ -203,7 +226,7 @@ function renderAreaScreen() {
   } else {
     banner = '<div class="banner">Conteo de '+monthLabel(ym)+' pendiente de completar.</div>';
   }
-
+ 
   var readOnly = status === 'submitted' || status === 'approved';
   function diffBadgeHtml(diff) {
     if (diff === null) return '';
@@ -231,20 +254,20 @@ function renderAreaScreen() {
       '</div>'
     );
   }).join('');
-
+ 
   if (state.products.length === 0) {
     rows = '<div class="empty"><div class="icon">📋</div><p>Todavía no hay productos cargados en '+AREA_LABEL[state.user.area]+'.</p></div>';
   }
-
+ 
   var allFilled = state.products.every(function(p){ var it = state.localItems[p.id]; return it && it.qty !== null && it.qty !== undefined && it.qty !== ''; });
-
+ 
   render(
     topbar() +
     '<main>' +
       '<h1>'+AREA_LABEL[state.user.area]+'</h1>' +
       '<p class="sub">Conteo de '+monthLabel(ym)+'</p>' +
       banner +
-      '<div class="card">' + rows + '</div>' +
+      '<div class="card product-grid">' + rows + '</div>' +
       (readOnly ? '' :
         '<button class="btn btn-primary" id="submit-btn" '+(allFilled?'':'disabled')+' onclick="submitCount()">Enviar conteo</button>'
       ) +
@@ -253,10 +276,10 @@ function renderAreaScreen() {
       '</div>' +
     '</main>'
   );
-
+ 
   window._diffBadgeHtml = diffBadgeHtml;
 }
-
+ 
 function updateQty(pid, val) {
   var n = val === '' ? null : parseInt(val, 10);
   if (!state.localItems[pid]) state.localItems[pid] = { qty: null, previousQty: 0, reason: '' };
@@ -302,12 +325,12 @@ async function submitCount() {
     showToast('No se pudo enviar. Probá de nuevo.');
   }
 }
-
+ 
 // ---------- suggest new product ----------
 function openSuggestProduct() {
   render(
     topbar() +
-    '<main>' +
+    '<main class="form-narrow-main">' +
       '<h2>Sugerir nuevo producto</h2>' +
       '<p class="sub">Quedará pendiente hasta que el manager lo apruebe.</p>' +
       '<div class="card">' +
@@ -368,7 +391,7 @@ async function submitSuggestion() {
   showToast('Sugerencia enviada');
   await drawArea();
 }
-
+ 
 // ---------- ADMIN SCREEN ----------
 async function drawAdmin() {
   renderAdminShell();
@@ -389,16 +412,21 @@ function renderAdminShell() {
   loadAdminTab();
 }
 function switchAdminTab(t) { state.adminTab = t; renderAdminShell(); }
-
+ 
 async function loadAdminTab() {
   var c = document.getElementById('admin-content');
-  if (state.adminTab === 'revisar') return renderRevisar(c);
-  if (state.adminTab === 'pendientes') return renderPendientes(c);
-  if (state.adminTab === 'personal') return renderPersonal(c);
-  if (state.adminTab === 'catalogo') return renderCatalogo(c);
-  if (state.adminTab === 'historial') return renderHistorial(c);
+  try {
+    if (state.adminTab === 'revisar') return await renderRevisar(c);
+    if (state.adminTab === 'pendientes') return await renderPendientes(c);
+    if (state.adminTab === 'personal') return await renderPersonal(c);
+    if (state.adminTab === 'catalogo') return await renderCatalogo(c);
+    if (state.adminTab === 'historial') return await renderHistorial(c);
+  } catch (e) {
+    console.error('Error cargando pestaña:', e);
+    c.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>No se pudieron cargar los datos (' + esc(e.code || e.message || 'error') + ').</p></div>';
+  }
 }
-
+ 
 async function renderRevisar(c) {
   var snap = await state.db.collection('counts').where('status','==','submitted').get();
   var docs = snap.docs;
@@ -414,16 +442,16 @@ async function renderRevisar(c) {
       '</div>'
     );
   }).join('');
-  c.innerHTML = html;
+  c.innerHTML = '<div class="cards-grid">' + html + '</div>';
 }
-
+ 
 async function openReview(countId) {
   var snap = await state.db.doc('counts/' + countId).get();
   var data = snap.data();
   var prodSnap = await state.db.collection('products').where('area','==',data.area).get();
   var prodMap = {};
   prodSnap.docs.forEach(function(d){ prodMap[d.id] = d.data(); });
-
+ 
   var rows = Object.keys(data.items||{}).map(function(pid){
     var it = data.items[pid];
     var p = prodMap[pid] || { name: '(producto eliminado)' };
@@ -439,20 +467,20 @@ async function openReview(countId) {
       '</div>'
     );
   }).join('');
-
+ 
   render(
     topbar() +
     '<main>' +
       '<h2>'+AREA_LABEL[data.area]+' — '+monthLabel(data.month)+'</h2>' +
       '<p class="sub">Enviado por '+esc(data.submittedBy||'-')+'</p>' +
-      '<div class="card">'+rows+'</div>' +
-      '<label class="field">Nota (opcional, para devolver)</label>' +
+      '<div class="card product-grid">'+rows+'</div>' +
+      '<div class="form-narrow"><label class="field">Nota (opcional, para devolver)</label>' +
       '<textarea id="review-note" rows="2" placeholder="Ej: revisá el conteo de tenedores"></textarea>' +
       '<div class="row" style="margin-top:16px">' +
         '<button class="btn btn-secondary" onclick="returnCount(\''+countId+'\')">Devolver</button>' +
         '<button class="btn btn-primary" onclick="approveCount(\''+countId+'\')">Aprobar</button>' +
       '</div>' +
-      '<button class="btn btn-secondary" style="margin-top:10px" onclick="renderAdminShell()">Volver</button>' +
+      '<button class="btn btn-secondary" style="margin-top:10px" onclick="renderAdminShell()">Volver</button></div>' +
     '</main>'
   );
 }
@@ -467,7 +495,7 @@ async function returnCount(countId) {
   showToast('Conteo devuelto al encargado');
   renderAdminShell();
 }
-
+ 
 async function renderPendientes(c) {
   var snap = await state.db.collection('products').where('status','==','pending').get();
   var docs = snap.docs;
@@ -490,7 +518,7 @@ async function renderPendientes(c) {
       '</div>'
     );
   }).join('');
-  c.innerHTML = html;
+  c.innerHTML = '<div class="cards-grid">' + html + '</div>';
 }
 async function approveProduct(id) {
   await state.db.doc('products/' + id).update({ status: 'approved' });
@@ -502,7 +530,7 @@ async function rejectProduct(id) {
   showToast('Producto rechazado');
   loadAdminTab();
 }
-
+ 
 async function renderPersonal(c) {
   var snap = await state.db.collection('staff').where('active','==',true).get();
   var docs = snap.docs;
@@ -517,14 +545,14 @@ async function renderPersonal(c) {
     );
   }).join('');
   c.innerHTML =
-    '<div class="card">' + (rows || '<p class="sub" style="margin:0">Sin personal cargado.</p>') + '</div>' +
-    '<button class="btn btn-primary" onclick="openAddStaff()">+ Agregar persona</button>';
+    '<div class="content-narrow"><div class="card">' + (rows || '<p class="sub" style="margin:0">Sin personal cargado.</p>') + '</div>' +
+    '<button class="btn btn-primary" onclick="openAddStaff()">+ Agregar persona</button></div>';
 }
 function openAddStaff() {
   var c = document.getElementById('admin-content');
   var areaOpts = AREAS.map(function(a){ return '<option value="'+a+'">'+AREA_LABEL[a]+'</option>'; }).join('');
   c.innerHTML =
-    '<div class="card">' +
+    '<div class="form-narrow"><div class="card">' +
       '<label class="field">Nombre</label>' +
       '<input type="text" id="as-name" placeholder="Ej: Sofía">' +
       '<label class="field">PIN de 4 dígitos</label>' +
@@ -536,7 +564,7 @@ function openAddStaff() {
       '<div id="as-area-wrap"><label class="field">Área</label><select id="as-area">'+areaOpts+'</select></div>' +
     '</div>' +
     '<button class="btn btn-primary" onclick="saveStaff()">Guardar</button>' +
-    '<button class="btn btn-secondary" style="margin-top:10px" onclick="renderPersonal(document.getElementById(\'admin-content\'))">Cancelar</button>';
+    '<button class="btn btn-secondary" style="margin-top:10px" onclick="renderPersonal(document.getElementById(\'admin-content\'))">Cancelar</button></div>';
 }
 async function saveStaff() {
   var name = document.getElementById('as-name').value.trim();
@@ -555,7 +583,7 @@ async function deactivateStaff(id) {
   showToast('Persona quitada');
   renderPersonal(document.getElementById('admin-content'));
 }
-
+ 
 async function renderCatalogo(c) {
   var areaOpts = AREAS.map(function(a){ return '<option value="'+a+'">'+AREA_LABEL[a]+'</option>'; }).join('');
   var snap = await state.db.collection('products').where('status','==','approved').get();
@@ -571,7 +599,7 @@ async function renderCatalogo(c) {
     );
   }).join('');
   c.innerHTML =
-    '<div class="card">' +
+    '<div class="card form-narrow">' +
       '<h3>Agregar producto directo</h3>' +
       '<label class="field">Nombre</label>' +
       '<input type="text" id="cp-name" placeholder="Ej: Copa de vino">' +
@@ -582,7 +610,7 @@ async function renderCatalogo(c) {
       '<div id="cp-preview" style="margin-top:10px"></div>' +
       '<button class="btn btn-primary" style="margin-top:14px" onclick="addCatalogProduct()">Agregar</button>' +
     '</div>' +
-    '<div class="card">' + (rows || '<p class="sub" style="margin:0">Sin productos en el catálogo.</p>') + '</div>';
+    '<div class="card product-grid">' + (rows || '<p class="sub" style="margin:0">Sin productos en el catálogo.</p>') + '</div>';
 }
 function previewCatalogPhoto() {
   var f = document.getElementById('cp-photo').files[0];
@@ -612,10 +640,13 @@ async function removeProduct(id) {
   showToast('Producto quitado del catálogo');
   renderCatalogo(document.getElementById('admin-content'));
 }
-
+ 
 async function renderHistorial(c) {
-  var snap = await state.db.collection('counts').where('status','==','approved').orderBy('month','desc').limit(24).get();
-  var docs = snap.docs;
+  var snap = await state.db.collection('counts').where('status','==','approved').get();
+  var docs = snap.docs.slice().sort(function(a,b){
+    var ma = a.data().month, mb = b.data().month;
+    return ma < mb ? 1 : (ma > mb ? -1 : 0);
+  }).slice(0, 36);
   if (docs.length === 0) { c.innerHTML = '<div class="empty"><div class="icon">🗄️</div><p>Todavía no hay conteos aprobados.</p></div>'; return; }
   var html = docs.map(function(d){
     var data = d.data();
@@ -628,9 +659,9 @@ async function renderHistorial(c) {
       '</div>'
     );
   }).join('');
-  c.innerHTML = '<div class="card">'+html+'</div>';
+  c.innerHTML = '<div class="card content-narrow">'+html+'</div>';
 }
-
+ 
 // ---------- dispatcher ----------
 async function draw() {
   if (state.screen === 'loading') { render('<div class="center-screen"><div class="spinner"></div></div>'); return; }
@@ -639,5 +670,5 @@ async function draw() {
   if (state.screen === 'area') return drawArea();
   if (state.screen === 'admin') return drawAdmin();
 }
-
+ 
 // init() se llama desde index.html una vez que Firebase está listo
