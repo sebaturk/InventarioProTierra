@@ -43,6 +43,15 @@ function photoUrl(photoId) {
   return window.__firebasePhotoUrl(photoId);
 }
 
+// Red de seguridad: si algo async falla sin un catch propio (bug nuestro, regla de
+// Firestore/Storage que lo bloquea, sin conexión, etc.), que se note en pantalla
+// en vez de que el botón parezca "no hacer nada".
+window.addEventListener('unhandledrejection', function (ev) {
+  console.error('Error no controlado:', ev.reason);
+  var msg = (ev.reason && (ev.reason.code || ev.reason.message)) || 'error desconocido';
+  showToast('Algo falló (' + msg + ')');
+});
+
 // ---------- init ----------
 async function init() {
   try {
@@ -74,7 +83,7 @@ function drawLogin() {
   var padBtns = keys.map(function(k){ return '<button onclick="pinPress('+k+')">'+k+'</button>'; }).join('');
   render(
     '<div class="center-screen" style="width:100%">' +
-      '<h1 style="text-align:center">Stock</h1>' +
+      '<div class="login-brand"><span class="brand">InventarioPro</span></div>' +
       '<p class="sub" style="text-align:center">Ingresá tu PIN</p>' +
       '<div class="pindots">'+dots+'</div>' +
       '<div class="pinpad">' + padBtns +
@@ -159,17 +168,22 @@ async function createFirstAdmin() {
   var name = document.getElementById('bs-name').value.trim();
   var pin = document.getElementById('bs-pin').value.trim();
   if (!name || !/^\d{4}$/.test(pin)) { showToast('Completá el nombre y un PIN de 4 dígitos'); return; }
-  await state.db.collection('staff').add({ name: name, pin: pin, role: 'admin', area: null, active: true, createdAt: new Date().toISOString() });
-  showToast('Administrador creado. Iniciá sesión.');
-  state.screen = 'login';
-  draw();
+  try {
+    await state.db.collection('staff').add({ name: name, pin: pin, role: 'admin', area: null, active: true, createdAt: new Date().toISOString() });
+    showToast('Administrador creado. Iniciá sesión.');
+    state.screen = 'login';
+    draw();
+  } catch (e) {
+    console.error('Error creando administrador:', e);
+    showToast('No se pudo crear (' + (e.code || e.message) + ')');
+  }
 }
 
 // ---------- topbar ----------
 function topbar() {
   if (!state.user) return '';
   var roleLabel = state.user.role === 'admin' ? 'Administrador' : AREA_LABEL[state.user.area] + ' · Encargado';
-  return '<div class="topbar"><div class="who"><span class="name">'+esc(state.user.name)+'</span><span class="role">'+esc(roleLabel)+'</span></div><button class="logout" onclick="logout()">Salir</button></div>';
+  return '<div class="topbar"><span class="brand">InventarioPro</span><div class="topbar-right"><div class="who"><span class="name">'+esc(state.user.name)+'</span><span class="role">'+esc(roleLabel)+'</span></div><button class="logout" onclick="logout()">Salir</button></div></div>';
 }
 
 // ---------- AREA SCREEN ----------
@@ -385,12 +399,17 @@ async function submitSuggestion() {
       photoId = up.id;
     } catch (e) { showToast('No se pudo subir la foto, se guarda sin foto'); }
   }
-  await state.db.collection('products').add({
-    name: name, area: state.user.area, status: 'pending', photoId: photoId,
-    suggestedBy: state.user.name, createdAt: new Date().toISOString(),
-  });
-  showToast('Sugerencia enviada');
-  await drawArea();
+  try {
+    await state.db.collection('products').add({
+      name: name, area: state.user.area, status: 'pending', photoId: photoId,
+      suggestedBy: state.user.name, createdAt: new Date().toISOString(),
+    });
+    showToast('Sugerencia enviada');
+    await drawArea();
+  } catch (e) {
+    console.error('Error enviando sugerencia:', e);
+    showToast('No se pudo enviar (' + (e.code || e.message) + ')');
+  }
 }
 
 // ---------- ADMIN SCREEN ----------
@@ -400,16 +419,18 @@ async function drawAdmin() {
 function renderAdminShell() {
   var tabs = [['revisar','Revisar conteos'],['pendientes','Productos'],['personal','Personal'],['catalogo','Catálogo'],['historial','Historial']];
   var tabHtml = tabs.map(function(t){
-    return '<div class="tab'+(state.adminTab===t[0]?' active':'')+'" onclick="switchAdminTab(\''+t[0]+'\')">'+t[1]+'</div>';
+    return '<div class="tab'+(state.adminTab===t[0]?' active':'')+'" onclick="switchAdminTab(\''+t[0]+'\')" data-tab="'+t[0]+'">'+t[1]+'</div>';
   }).join('');
   render(
     topbar() +
     '<main>' +
       '<h1>Panel de administración</h1>' +
-      '<div class="tabs">'+tabHtml+'</div>' +
+      '<div class="tabs" id="admin-tabs">'+tabHtml+'</div>' +
       '<div id="admin-content"><div class="spinner"></div></div>' +
     '</main>'
   );
+  var activeTab = document.querySelector('.tab.active');
+  if (activeTab) activeTab.scrollIntoView({ block: 'nearest', inline: 'center' });
   loadAdminTab();
 }
 function switchAdminTab(t) { state.adminTab = t; renderAdminShell(); }
@@ -486,15 +507,25 @@ async function openReview(countId) {
   );
 }
 async function approveCount(countId) {
-  await state.db.doc('counts/' + countId).update({ status: 'approved', reviewedBy: state.user.name, reviewedAt: new Date().toISOString() });
-  showToast('Conteo aprobado');
-  renderAdminShell();
+  try {
+    await state.db.doc('counts/' + countId).update({ status: 'approved', reviewedBy: state.user.name, reviewedAt: new Date().toISOString() });
+    showToast('Conteo aprobado');
+    renderAdminShell();
+  } catch (e) {
+    console.error('Error aprobando conteo:', e);
+    showToast('No se pudo aprobar (' + (e.code || e.message) + ')');
+  }
 }
 async function returnCount(countId) {
   var note = document.getElementById('review-note').value.trim();
-  await state.db.doc('counts/' + countId).update({ status: 'returned', managerNote: note, reviewedBy: state.user.name, reviewedAt: new Date().toISOString() });
-  showToast('Conteo devuelto al encargado');
-  renderAdminShell();
+  try {
+    await state.db.doc('counts/' + countId).update({ status: 'returned', managerNote: note, reviewedBy: state.user.name, reviewedAt: new Date().toISOString() });
+    showToast('Conteo devuelto al encargado');
+    renderAdminShell();
+  } catch (e) {
+    console.error('Error devolviendo conteo:', e);
+    showToast('No se pudo devolver (' + (e.code || e.message) + ')');
+  }
 }
 
 async function renderPendientes(c) {
@@ -522,14 +553,24 @@ async function renderPendientes(c) {
   c.innerHTML = '<div class="cards-grid">' + html + '</div>';
 }
 async function approveProduct(id) {
-  await state.db.doc('products/' + id).update({ status: 'approved' });
-  showToast('Producto aprobado');
-  loadAdminTab();
+  try {
+    await state.db.doc('products/' + id).update({ status: 'approved' });
+    showToast('Producto aprobado');
+    loadAdminTab();
+  } catch (e) {
+    console.error('Error aprobando producto:', e);
+    showToast('No se pudo aprobar (' + (e.code || e.message) + ')');
+  }
 }
 async function rejectProduct(id) {
-  await state.db.doc('products/' + id).update({ status: 'rejected' });
-  showToast('Producto rechazado');
-  loadAdminTab();
+  try {
+    await state.db.doc('products/' + id).update({ status: 'rejected' });
+    showToast('Producto rechazado');
+    loadAdminTab();
+  } catch (e) {
+    console.error('Error rechazando producto:', e);
+    showToast('No se pudo rechazar (' + (e.code || e.message) + ')');
+  }
 }
 
 async function renderPersonal(c) {
@@ -573,16 +614,26 @@ async function saveStaff() {
   var role = document.getElementById('as-role').value;
   var area = role === 'area' ? document.getElementById('as-area').value : null;
   if (!name || !/^\d{4}$/.test(pin)) { showToast('Completá nombre y PIN de 4 dígitos'); return; }
-  var existing = await state.db.collection('staff').where('pin','==',pin).where('active','==',true).limit(1).get();
-  if (!existing.empty) { showToast('Ese PIN ya está en uso'); return; }
-  await state.db.collection('staff').add({ name: name, pin: pin, role: role, area: area, active: true, createdAt: new Date().toISOString() });
-  showToast('Persona agregada');
-  renderPersonal(document.getElementById('admin-content'));
+  try {
+    var existing = await state.db.collection('staff').where('pin','==',pin).where('active','==',true).limit(1).get();
+    if (!existing.empty) { showToast('Ese PIN ya está en uso'); return; }
+    await state.db.collection('staff').add({ name: name, pin: pin, role: role, area: area, active: true, createdAt: new Date().toISOString() });
+    showToast('Persona agregada');
+    renderPersonal(document.getElementById('admin-content'));
+  } catch (e) {
+    console.error('Error guardando persona:', e);
+    showToast('No se pudo guardar (' + (e.code || e.message) + ')');
+  }
 }
 async function deactivateStaff(id) {
-  await state.db.doc('staff/' + id).update({ active: false });
-  showToast('Persona quitada');
-  renderPersonal(document.getElementById('admin-content'));
+  try {
+    await state.db.doc('staff/' + id).update({ active: false });
+    showToast('Persona quitada');
+    renderPersonal(document.getElementById('admin-content'));
+  } catch (e) {
+    console.error('Error quitando persona:', e);
+    showToast('No se pudo quitar (' + (e.code || e.message) + ')');
+  }
 }
 
 async function renderCatalogo(c) {
@@ -604,7 +655,8 @@ async function renderCatalogo(c) {
     );
   }).join('');
   c.innerHTML =
-    '<div class="card form-narrow">' +
+    '<div class="split">' +
+    '<div class="card">' +
       '<h3>Agregar producto directo</h3>' +
       '<label class="field">Nombre</label>' +
       '<input type="text" id="cp-name" placeholder="Ej: Copa de vino">' +
@@ -615,7 +667,8 @@ async function renderCatalogo(c) {
       '<div id="cp-preview" style="margin-top:10px"></div>' +
       '<button class="btn btn-primary" style="margin-top:14px" onclick="addCatalogProduct()">Agregar</button>' +
     '</div>' +
-    '<div class="card product-grid">' + (rows || '<p class="sub" style="margin:0">Sin productos en el catálogo.</p>') + '</div>';
+    '<div class="card product-grid">' + (rows || '<p class="sub" style="margin:0">Sin productos en el catálogo.</p>') + '</div>' +
+    '</div>';
 }
 function previewCatalogPhoto() {
   var f = document.getElementById('cp-photo').files[0];
@@ -636,9 +689,14 @@ async function addCatalogProduct() {
       photoId = up.id;
     } catch(e) { showToast('No se pudo subir la foto'); }
   }
-  await state.db.collection('products').add({ name: name, area: area, status: 'approved', photoId: photoId, createdAt: new Date().toISOString() });
-  showToast('Producto agregado');
-  renderCatalogo(document.getElementById('admin-content'));
+  try {
+    await state.db.collection('products').add({ name: name, area: area, status: 'approved', photoId: photoId, createdAt: new Date().toISOString() });
+    showToast('Producto agregado');
+    renderCatalogo(document.getElementById('admin-content'));
+  } catch (e) {
+    console.error('Error agregando producto:', e);
+    showToast('No se pudo agregar (' + (e.code || e.message) + ')');
+  }
 }
 function changeProductPhoto(id) {
   var input = document.createElement('input');
@@ -662,9 +720,14 @@ function changeProductPhoto(id) {
   input.click();
 }
 async function removeProduct(id) {
-  await state.db.doc('products/' + id).update({ status: 'rejected' });
-  showToast('Producto quitado del catálogo');
-  renderCatalogo(document.getElementById('admin-content'));
+  try {
+    await state.db.doc('products/' + id).update({ status: 'rejected' });
+    showToast('Producto quitado del catálogo');
+    renderCatalogo(document.getElementById('admin-content'));
+  } catch (e) {
+    console.error('Error quitando producto:', e);
+    showToast('No se pudo quitar (' + (e.code || e.message) + ')');
+  }
 }
 
 async function renderHistorial(c) {
