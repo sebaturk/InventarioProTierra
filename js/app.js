@@ -2,7 +2,7 @@
 var AREAS = ['cocina','barra','piso'];
 var AREA_LABEL = { cocina: 'Cocina', barra: 'Barra', piso: 'Piso' };
 var MONTHS_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
- 
+
 var state = {
   ready: false,
   db: null,
@@ -16,7 +16,7 @@ var state = {
   localItems: {},    // productId -> {qty, reason}
   saveTimer: null
 };
- 
+
 function el(html) {
   var d = document.createElement('div');
   d.innerHTML = html.trim();
@@ -42,7 +42,7 @@ function photoUrl(photoId) {
   if (!photoId) return '';
   return window.__firebasePhotoUrl(photoId);
 }
- 
+
 // ---------- init ----------
 async function init() {
   try {
@@ -65,7 +65,7 @@ async function init() {
   }
   draw();
 }
- 
+
 // ---------- PIN login ----------
 function drawLogin() {
   var dots = '';
@@ -139,7 +139,7 @@ function logout() {
   state.screen = 'login';
   draw();
 }
- 
+
 // ---------- bootstrap first admin ----------
 function drawBootstrap() {
   render(
@@ -164,14 +164,14 @@ async function createFirstAdmin() {
   state.screen = 'login';
   draw();
 }
- 
+
 // ---------- topbar ----------
 function topbar() {
   if (!state.user) return '';
   var roleLabel = state.user.role === 'admin' ? 'Administrador' : AREA_LABEL[state.user.area] + ' · Encargado';
   return '<div class="topbar"><div class="who"><span class="name">'+esc(state.user.name)+'</span><span class="role">'+esc(roleLabel)+'</span></div><button class="logout" onclick="logout()">Salir</button></div>';
 }
- 
+
 // ---------- AREA SCREEN ----------
 async function drawArea() {
   var area = state.user.area;
@@ -179,12 +179,12 @@ async function drawArea() {
   var countId = area + '_' + ym;
   var countRef = state.db.doc('counts/' + countId);
   var snap = await countRef.get();
- 
+
   var prodSnap = await state.db.collection('products').where('area','==',area).where('status','==','approved').get();
   var products = prodSnap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
   products.sort(function(a,b){ return a.name.localeCompare(b.name); });
   state.products = products;
- 
+
   if (!snap.exists) {
     // find last approved count for baseline
     // Sin orderBy en la consulta: Firestore exigiría un índice compuesto.
@@ -206,12 +206,12 @@ async function drawArea() {
     await countRef.set(newDoc);
     snap = await countRef.get();
   }
- 
+
   state.currentCount = Object.assign({id: countId}, snap.data());
   state.localItems = JSON.parse(JSON.stringify(state.currentCount.items || {}));
   renderAreaScreen();
 }
- 
+
 function renderAreaScreen() {
   var c = state.currentCount;
   var ym = currentYm();
@@ -226,7 +226,7 @@ function renderAreaScreen() {
   } else {
     banner = '<div class="banner">Conteo de '+monthLabel(ym)+' pendiente de completar.</div>';
   }
- 
+
   var readOnly = status === 'submitted' || status === 'approved';
   function diffBadgeHtml(diff) {
     if (diff === null) return '';
@@ -245,6 +245,7 @@ function renderAreaScreen() {
         '<div class="thumb">'+photo+'</div>' +
         '<div class="product-info">' +
           '<div class="pname">'+esc(p.name)+'</div>' +
+          (p.uso ? '<div class="puso">'+esc(p.uso)+'</div>' : '') +
           '<div class="pmeta">Anterior: '+it.previousQty+' <span id="diff-'+p.id+'">'+diffBadgeHtml(diff)+'</span></div>' +
         '</div>' +
         '<input class="qty-input" id="qty-'+p.id+'" type="number" min="0" inputmode="numeric" placeholder="0" value="'+qtyVal+'" '+(readOnly?'disabled':'')+' oninput="updateQty(\''+p.id+'\', this.value)">' +
@@ -254,13 +255,13 @@ function renderAreaScreen() {
       '</div>'
     );
   }).join('');
- 
+
   if (state.products.length === 0) {
     rows = '<div class="empty"><div class="icon">📋</div><p>Todavía no hay productos cargados en '+AREA_LABEL[state.user.area]+'.</p></div>';
   }
- 
+
   var allFilled = state.products.every(function(p){ var it = state.localItems[p.id]; return it && it.qty !== null && it.qty !== undefined && it.qty !== ''; });
- 
+
   render(
     topbar() +
     '<main>' +
@@ -276,10 +277,10 @@ function renderAreaScreen() {
       '</div>' +
     '</main>'
   );
- 
+
   window._diffBadgeHtml = diffBadgeHtml;
 }
- 
+
 function updateQty(pid, val) {
   var n = val === '' ? null : parseInt(val, 10);
   if (!state.localItems[pid]) state.localItems[pid] = { qty: null, previousQty: 0, reason: '' };
@@ -325,7 +326,7 @@ async function submitCount() {
     showToast('No se pudo enviar. Probá de nuevo.');
   }
 }
- 
+
 // ---------- suggest new product ----------
 function openSuggestProduct() {
   render(
@@ -391,7 +392,7 @@ async function submitSuggestion() {
   showToast('Sugerencia enviada');
   await drawArea();
 }
- 
+
 // ---------- ADMIN SCREEN ----------
 async function drawAdmin() {
   renderAdminShell();
@@ -412,7 +413,7 @@ function renderAdminShell() {
   loadAdminTab();
 }
 function switchAdminTab(t) { state.adminTab = t; renderAdminShell(); }
- 
+
 async function loadAdminTab() {
   var c = document.getElementById('admin-content');
   try {
@@ -426,7 +427,7 @@ async function loadAdminTab() {
     c.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>No se pudieron cargar los datos (' + esc(e.code || e.message || 'error') + ').</p></div>';
   }
 }
- 
+
 async function renderRevisar(c) {
   var snap = await state.db.collection('counts').where('status','==','submitted').get();
   var docs = snap.docs;
@@ -444,14 +445,14 @@ async function renderRevisar(c) {
   }).join('');
   c.innerHTML = '<div class="cards-grid">' + html + '</div>';
 }
- 
+
 async function openReview(countId) {
   var snap = await state.db.doc('counts/' + countId).get();
   var data = snap.data();
   var prodSnap = await state.db.collection('products').where('area','==',data.area).get();
   var prodMap = {};
   prodSnap.docs.forEach(function(d){ prodMap[d.id] = d.data(); });
- 
+
   var rows = Object.keys(data.items||{}).map(function(pid){
     var it = data.items[pid];
     var p = prodMap[pid] || { name: '(producto eliminado)' };
@@ -467,7 +468,7 @@ async function openReview(countId) {
       '</div>'
     );
   }).join('');
- 
+
   render(
     topbar() +
     '<main>' +
@@ -495,7 +496,7 @@ async function returnCount(countId) {
   showToast('Conteo devuelto al encargado');
   renderAdminShell();
 }
- 
+
 async function renderPendientes(c) {
   var snap = await state.db.collection('products').where('status','==','pending').get();
   var docs = snap.docs;
@@ -530,7 +531,7 @@ async function rejectProduct(id) {
   showToast('Producto rechazado');
   loadAdminTab();
 }
- 
+
 async function renderPersonal(c) {
   var snap = await state.db.collection('staff').where('active','==',true).get();
   var docs = snap.docs;
@@ -583,17 +584,21 @@ async function deactivateStaff(id) {
   showToast('Persona quitada');
   renderPersonal(document.getElementById('admin-content'));
 }
- 
+
 async function renderCatalogo(c) {
   var areaOpts = AREAS.map(function(a){ return '<option value="'+a+'">'+AREA_LABEL[a]+'</option>'; }).join('');
   var snap = await state.db.collection('products').where('status','==','approved').get();
-  var docs = snap.docs.sort(function(a,b){ return a.data().name.localeCompare(b.data().name); });
+  var docs = snap.docs.sort(function(a,b){
+    var da = a.data(), db_ = b.data();
+    return AREAS.indexOf(da.area) - AREAS.indexOf(db_.area) || da.name.localeCompare(db_.name);
+  });
   var rows = docs.map(function(d){
     var p = d.data();
     return (
       '<div class="product-row">' +
-        '<div class="thumb">'+(p.photoId ? '<img src="'+photoUrl(p.photoId)+'">' : '📦')+'</div>' +
-        '<div class="product-info"><div class="pname">'+esc(p.name)+'</div><div class="pmeta">'+AREA_LABEL[p.area]+'</div></div>' +
+        '<div class="thumb" style="cursor:pointer" onclick="changeProductPhoto(\''+d.id+'\')">'+(p.photoId ? '<img src="'+photoUrl(p.photoId)+'">' : '📦')+'</div>' +
+        '<div class="product-info"><div class="pname">'+esc(p.name)+'</div><div class="pmeta">'+AREA_LABEL[p.area]+(p.uso ? ' · '+esc(p.uso) : '')+(p.photoId ? '' : ' · sin foto')+'</div></div>' +
+        '<button class="btn btn-secondary btn-sm" title="Cambiar foto" onclick="changeProductPhoto(\''+d.id+'\')">📷</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="removeProduct(\''+d.id+'\')">Quitar</button>' +
       '</div>'
     );
@@ -635,12 +640,33 @@ async function addCatalogProduct() {
   showToast('Producto agregado');
   renderCatalogo(document.getElementById('admin-content'));
 }
+function changeProductPhoto(id) {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async function() {
+    var f = input.files[0];
+    if (!f) return;
+    showToast('Subiendo foto…');
+    try {
+      var resized = await resizeImage(f, 800, 0.82);
+      var up = await state.assets.upload(resized, { type: 'image/jpeg' });
+      await state.db.doc('products/' + id).update({ photoId: up.id });
+      showToast('Foto actualizada');
+      renderCatalogo(document.getElementById('admin-content'));
+    } catch (e) {
+      console.error('Error subiendo foto:', e);
+      showToast('No se pudo subir la foto');
+    }
+  };
+  input.click();
+}
 async function removeProduct(id) {
   await state.db.doc('products/' + id).update({ status: 'rejected' });
   showToast('Producto quitado del catálogo');
   renderCatalogo(document.getElementById('admin-content'));
 }
- 
+
 async function renderHistorial(c) {
   var snap = await state.db.collection('counts').where('status','==','approved').get();
   var docs = snap.docs.slice().sort(function(a,b){
@@ -661,7 +687,7 @@ async function renderHistorial(c) {
   }).join('');
   c.innerHTML = '<div class="card content-narrow">'+html+'</div>';
 }
- 
+
 // ---------- dispatcher ----------
 async function draw() {
   if (state.screen === 'loading') { render('<div class="center-screen"><div class="spinner"></div></div>'); return; }
@@ -670,5 +696,5 @@ async function draw() {
   if (state.screen === 'area') return drawArea();
   if (state.screen === 'admin') return drawAdmin();
 }
- 
+
 // init() se llama desde index.html una vez que Firebase está listo
