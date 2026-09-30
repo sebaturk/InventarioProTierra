@@ -42,6 +42,15 @@ function photoUrl(photoId) {
   if (!photoId) return '';
   return window.__firebasePhotoUrl(photoId);
 }
+function withTimeout(promise, ms, label) {
+  return new Promise(function (resolve, reject) {
+    var t = setTimeout(function () { reject(new Error('tiempo agotado ' + label)); }, ms);
+    promise.then(
+      function (v) { clearTimeout(t); resolve(v); },
+      function (e) { clearTimeout(t); reject(e); }
+    );
+  });
+}
 
 // Red de seguridad: si algo async falla sin un catch propio (bug nuestro, regla de
 // Firestore/Storage que lo bloquea, sin conexión, etc.), que se note en pantalla
@@ -258,7 +267,7 @@ function renderAreaScreen() {
       '<div class="product-row" style="flex-wrap:wrap">' +
         '<div class="thumb">'+photo+'</div>' +
         '<div class="product-info">' +
-          '<div class="pname">'+esc(p.name)+'</div>' +
+          '<div class="pname">'+esc(p.name)+' <button type="button" class="edit-link" onclick="openEditProduct(\''+p.id+'\')" title="Editar nombre, descripción o foto">✏️</button></div>' +
           (p.uso ? '<div class="puso">'+esc(p.uso)+'</div>' : '') +
           '<div class="pmeta">Anterior: '+it.previousQty+' <span id="diff-'+p.id+'">'+diffBadgeHtml(diff)+'</span></div>' +
         '</div>' +
@@ -355,7 +364,7 @@ function openSuggestProduct() {
         '<label class="upload-label">📷 Elegir foto<input type="file" accept="image/*" id="np-photo" style="display:none" onchange="previewPhoto()"></label>' +
         '<div id="np-preview" style="margin-top:10px"></div>' +
       '</div>' +
-      '<button class="btn btn-primary" onclick="submitSuggestion()">Enviar sugerencia</button>' +
+      '<button class="btn btn-primary" id="suggest-btn" onclick="submitSuggestion()">Enviar sugerencia</button>' +
       '<button class="btn btn-secondary" style="margin-top:10px" onclick="renderAreaScreen()">Cancelar</button>' +
     '</main>'
   );
@@ -391,24 +400,87 @@ async function submitSuggestion() {
   var name = document.getElementById('np-name').value.trim();
   var file = document.getElementById('np-photo').files[0];
   if (!name) { showToast('Ingresá un nombre'); return; }
+  var btn = document.getElementById('suggest-btn');
+  btn.disabled = true; btn.textContent = 'Enviando…';
   var photoId = null;
   if (file) {
     try {
-      var resized = await resizeImage(file, 800, 0.82);
-      var up = await state.assets.upload(resized, { type: 'image/jpeg' });
+      showToast('Subiendo foto…');
+      var resized = await withTimeout(resizeImage(file, 800, 0.82), 15000, 'procesando la foto');
+      var up = await withTimeout(state.assets.upload(resized, { type: 'image/jpeg' }), 20000, 'subiendo la foto');
       photoId = up.id;
-    } catch (e) { showToast('No se pudo subir la foto, se guarda sin foto'); }
+    } catch (e) {
+      console.error('Error subiendo foto de sugerencia:', e);
+      showToast('No se pudo subir la foto, se guarda sin foto (' + (e.code || e.message) + ')');
+    }
   }
   try {
-    await state.db.collection('products').add({
+    await withTimeout(state.db.collection('products').add({
       name: name, area: state.user.area, status: 'pending', photoId: photoId,
       suggestedBy: state.user.name, createdAt: new Date().toISOString(),
-    });
+    }), 15000, 'guardando la sugerencia');
     showToast('Sugerencia enviada');
     await drawArea();
   } catch (e) {
     console.error('Error enviando sugerencia:', e);
+    btn.disabled = false; btn.textContent = 'Enviar sugerencia';
     showToast('No se pudo enviar (' + (e.code || e.message) + ')');
+  }
+}
+
+// ---------- edit product (encargado: nombre, descripción, foto) ----------
+function openEditProduct(id) {
+  var p = state.products.find(function (x) { return x.id === id; });
+  if (!p) { showToast('No se encontró el producto'); return; }
+  render(
+    topbar() +
+    '<main class="form-narrow-main">' +
+      '<h2>Editar producto</h2>' +
+      '<p class="sub">Los cambios se guardan al instante para todo el equipo.</p>' +
+      '<div class="card">' +
+        '<label class="field">Nombre</label>' +
+        '<input type="text" id="ep-name" value="'+esc(p.name)+'">' +
+        '<label class="field">Descripción / referencia (opcional)</label>' +
+        '<input type="text" id="ep-uso" value="'+esc(p.uso || '')+'" placeholder="Ej: Tierra/Brasa">' +
+        '<label class="field">Foto</label>' +
+        '<div style="display:flex;align-items:center;gap:12px">' +
+          '<div class="thumb" id="ep-preview">'+(p.photoId ? '<img src="'+photoUrl(p.photoId)+'">' : '📦')+'</div>' +
+          '<label class="upload-label" style="flex:1">📷 Cambiar foto<input type="file" accept="image/*" id="ep-photo" style="display:none" onchange="previewEditPhoto()"></label>' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" id="ep-save-btn" onclick="saveProductEdit(\''+id+'\')">Guardar cambios</button>' +
+      '<button class="btn btn-secondary" style="margin-top:10px" onclick="renderAreaScreen()">Cancelar</button>' +
+    '</main>'
+  );
+}
+function previewEditPhoto() {
+  var f = document.getElementById('ep-photo').files[0];
+  if (!f) return;
+  var url = URL.createObjectURL(f);
+  document.getElementById('ep-preview').innerHTML = '<img src="'+url+'">';
+}
+async function saveProductEdit(id) {
+  var btn = document.getElementById('ep-save-btn');
+  var name = document.getElementById('ep-name').value.trim();
+  var uso = document.getElementById('ep-uso').value.trim();
+  var file = document.getElementById('ep-photo').files[0];
+  if (!name) { showToast('Ingresá un nombre'); return; }
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  var update = { name: name, uso: uso || null };
+  try {
+    if (file) {
+      showToast('Subiendo foto…');
+      var resized = await withTimeout(resizeImage(file, 800, 0.82), 15000, 'procesando la foto');
+      var up = await withTimeout(state.assets.upload(resized, { type: 'image/jpeg' }), 20000, 'subiendo la foto');
+      update.photoId = up.id;
+    }
+    await withTimeout(state.db.doc('products/' + id).update(update), 15000, 'guardando los cambios');
+    showToast('Producto actualizado');
+    await drawArea();
+  } catch (e) {
+    console.error('Error editando producto:', e);
+    btn.disabled = false; btn.textContent = 'Guardar cambios';
+    showToast('No se pudo guardar (' + (e.code || e.message) + ')');
   }
 }
 
@@ -665,7 +737,7 @@ async function renderCatalogo(c) {
       '<label class="field">Foto</label>' +
       '<label class="upload-label">📷 Elegir foto<input type="file" accept="image/*" id="cp-photo" style="display:none" onchange="previewCatalogPhoto()"></label>' +
       '<div id="cp-preview" style="margin-top:10px"></div>' +
-      '<button class="btn btn-primary" style="margin-top:14px" onclick="addCatalogProduct()">Agregar</button>' +
+      '<button class="btn btn-primary" id="cp-add-btn" style="margin-top:14px" onclick="addCatalogProduct()">Agregar</button>' +
     '</div>' +
     '<div class="card product-grid">' + (rows || '<p class="sub" style="margin:0">Sin productos en el catálogo.</p>') + '</div>' +
     '</div>';
@@ -681,20 +753,27 @@ async function addCatalogProduct() {
   var area = document.getElementById('cp-area').value;
   var file = document.getElementById('cp-photo').files[0];
   if (!name) { showToast('Ingresá un nombre'); return; }
+  var btn = document.getElementById('cp-add-btn');
+  btn.disabled = true; btn.textContent = 'Agregando…';
   var photoId = null;
   if (file) {
     try {
-      var resized = await resizeImage(file, 800, 0.82);
-      var up = await state.assets.upload(resized, { type: 'image/jpeg' });
+      showToast('Subiendo foto…');
+      var resized = await withTimeout(resizeImage(file, 800, 0.82), 15000, 'procesando la foto');
+      var up = await withTimeout(state.assets.upload(resized, { type: 'image/jpeg' }), 20000, 'subiendo la foto');
       photoId = up.id;
-    } catch(e) { showToast('No se pudo subir la foto'); }
+    } catch(e) {
+      console.error('Error subiendo foto:', e);
+      showToast('No se pudo subir la foto (' + (e.code || e.message) + ')');
+    }
   }
   try {
-    await state.db.collection('products').add({ name: name, area: area, status: 'approved', photoId: photoId, createdAt: new Date().toISOString() });
+    await withTimeout(state.db.collection('products').add({ name: name, area: area, status: 'approved', photoId: photoId, createdAt: new Date().toISOString() }), 15000, 'guardando el producto');
     showToast('Producto agregado');
     renderCatalogo(document.getElementById('admin-content'));
   } catch (e) {
     console.error('Error agregando producto:', e);
+    btn.disabled = false; btn.textContent = 'Agregar';
     showToast('No se pudo agregar (' + (e.code || e.message) + ')');
   }
 }
@@ -707,14 +786,14 @@ function changeProductPhoto(id) {
     if (!f) return;
     showToast('Subiendo foto…');
     try {
-      var resized = await resizeImage(f, 800, 0.82);
-      var up = await state.assets.upload(resized, { type: 'image/jpeg' });
-      await state.db.doc('products/' + id).update({ photoId: up.id });
+      var resized = await withTimeout(resizeImage(f, 800, 0.82), 15000, 'procesando la foto');
+      var up = await withTimeout(state.assets.upload(resized, { type: 'image/jpeg' }), 20000, 'subiendo la foto');
+      await withTimeout(state.db.doc('products/' + id).update({ photoId: up.id }), 15000, 'guardando la foto');
       showToast('Foto actualizada');
       renderCatalogo(document.getElementById('admin-content'));
     } catch (e) {
       console.error('Error subiendo foto:', e);
-      showToast('No se pudo subir la foto');
+      showToast('No se pudo subir la foto (' + (e.code || e.message) + ')');
     }
   };
   input.click();
