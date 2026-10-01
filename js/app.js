@@ -406,7 +406,7 @@ async function submitSuggestion() {
   if (file) {
     try {
       showToast('Subiendo foto…');
-      var resized = await withTimeout(resizeImage(file, 800, 0.82), 15000, 'procesando la foto');
+      var resized = await withTimeout(resizeImage(file, 640, 0.72), 15000, 'procesando la foto');
       var up = await withTimeout(state.assets.upload(resized, { type: 'image/jpeg' }), 20000, 'subiendo la foto');
       photoId = up.id;
     } catch (e) {
@@ -470,7 +470,7 @@ async function saveProductEdit(id) {
   try {
     if (file) {
       showToast('Subiendo foto…');
-      var resized = await withTimeout(resizeImage(file, 800, 0.82), 15000, 'procesando la foto');
+      var resized = await withTimeout(resizeImage(file, 640, 0.72), 15000, 'procesando la foto');
       var up = await withTimeout(state.assets.upload(resized, { type: 'image/jpeg' }), 20000, 'subiendo la foto');
       update.photoId = up.id;
     }
@@ -759,7 +759,7 @@ async function addCatalogProduct() {
   if (file) {
     try {
       showToast('Subiendo foto…');
-      var resized = await withTimeout(resizeImage(file, 800, 0.82), 15000, 'procesando la foto');
+      var resized = await withTimeout(resizeImage(file, 640, 0.72), 15000, 'procesando la foto');
       var up = await withTimeout(state.assets.upload(resized, { type: 'image/jpeg' }), 20000, 'subiendo la foto');
       photoId = up.id;
     } catch(e) {
@@ -786,7 +786,7 @@ function changeProductPhoto(id) {
     if (!f) return;
     showToast('Subiendo foto…');
     try {
-      var resized = await withTimeout(resizeImage(f, 800, 0.82), 15000, 'procesando la foto');
+      var resized = await withTimeout(resizeImage(f, 640, 0.72), 15000, 'procesando la foto');
       var up = await withTimeout(state.assets.upload(resized, { type: 'image/jpeg' }), 20000, 'subiendo la foto');
       await withTimeout(state.db.doc('products/' + id).update({ photoId: up.id }), 15000, 'guardando la foto');
       showToast('Foto actualizada');
