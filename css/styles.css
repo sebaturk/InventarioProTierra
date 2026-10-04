@@ -100,9 +100,11 @@ img { max-width: 100%; }
   display: inline-flex; align-items: center; gap: 9px;
   font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
 }
-.brand::before {
-  content: ""; width: 11px; height: 11px; border-radius: 3px; background: var(--accent); flex-shrink: 0;
+.brand-mark {
+  width: 24px; height: 24px; padding: 4px; box-sizing: border-box;
+  background: var(--accent); border-radius: 7px; flex-shrink: 0; color: #F5F5F7;
 }
+.brand-mark rect { fill: currentColor; }
 .topbar-right { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .topbar .who { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
 .topbar .who .name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
@@ -193,7 +195,7 @@ label.field:first-child { margin-top: 0; }
 .login-brand { text-align: center; margin-bottom: 4px; }
 .login-brand h1 { font-size: 28px; margin: 0; }
 .login-brand .brand { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
-.login-brand .brand::before { width: 14px; height: 14px; border-radius: 4px; }
+.login-brand .brand-mark { width: 34px; height: 34px; padding: 6px; border-radius: 10px; }
 .pinpad {
   --pad: clamp(210px, min(340px, 88vw, calc((100vh - 250px) * 0.72)), 340px);
   display: grid; grid-template-columns: repeat(3, 1fr);

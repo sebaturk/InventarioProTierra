@@ -92,7 +92,7 @@ function drawLogin() {
   var padBtns = keys.map(function(k){ return '<button onclick="pinPress('+k+')">'+k+'</button>'; }).join('');
   render(
     '<div class="center-screen" style="width:100%">' +
-      '<div class="login-brand"><span class="brand">InventarioPro</span></div>' +
+      '<div class="login-brand"><span class="brand"><svg viewBox="0 0 24 24" class="brand-mark" aria-hidden="true"><rect x="4" y="14" width="4" height="6" rx="1.6"/><rect x="10" y="10" width="4" height="10" rx="1.6"/><rect x="16" y="6" width="4" height="14" rx="1.6"/></svg>InventarioPro</span></div>' +
       '<p class="sub" style="text-align:center">Ingresá tu PIN</p>' +
       '<div class="pindots">'+dots+'</div>' +
       '<div class="pinpad">' + padBtns +
@@ -192,7 +192,7 @@ async function createFirstAdmin() {
 function topbar() {
   if (!state.user) return '';
   var roleLabel = state.user.role === 'admin' ? 'Administrador' : AREA_LABEL[state.user.area] + ' · Encargado';
-  return '<div class="topbar"><span class="brand">InventarioPro</span><div class="topbar-right"><div class="who"><span class="name">'+esc(state.user.name)+'</span><span class="role">'+esc(roleLabel)+'</span></div><button class="logout" onclick="logout()">Salir</button></div></div>';
+  return '<div class="topbar"><span class="brand"><svg viewBox="0 0 24 24" class="brand-mark" aria-hidden="true"><rect x="4" y="14" width="4" height="6" rx="1.6"/><rect x="10" y="10" width="4" height="10" rx="1.6"/><rect x="16" y="6" width="4" height="14" rx="1.6"/></svg>InventarioPro</span><div class="topbar-right"><div class="who"><span class="name">'+esc(state.user.name)+'</span><span class="role">'+esc(roleLabel)+'</span></div><button class="logout" onclick="logout()">Salir</button></div></div>';
 }
 
 // ---------- AREA SCREEN ----------

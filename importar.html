@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>InventarioPro — Carga inicial</title>
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/styles.css">
+<style>
+  .imp-wrap { max-width: 640px; margin: 0 auto; padding: 24px 20px 60px; }
+  .imp-area { margin-top: 18px; }
+  .imp-area h3 { margin-bottom: 8px; }
+  .imp-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .imp-table td { padding: 7px 4px; border-bottom: 1px solid var(--border); }
+  .imp-table td.num { text-align: right; font-variant-numeric: tabular-nums; width: 64px; }
+  .imp-table .uso { color: var(--text-muted); font-size: 12px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; margin: 16px 0; }
+  .check input { margin-top: 3px; }
+  #log { font-size: 13px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="imp-wrap">
+  <h1>Carga inicial de productos</h1>
+  <p class="sub">Importa el catálogo desde tu Excel de Tierrasal. Se puede ejecutar más de una vez: lo que ya existe se saltea y no se pisa.</p>
+
+  <div id="gate" class="card">
+    <label class="field">PIN de administrador</label>
+    <input type="tel" id="pin" maxlength="4" placeholder="0000" autocomplete="off">
+    <button class="btn btn-primary" style="margin-top:16px" onclick="unlock()">Continuar</button>
+    <div id="gate-msg" style="color:var(--danger);font-size:13px;margin-top:10px"></div>
+  </div>
+
+  <div id="main" style="display:none"></div>
+</div>
+
+<script type="module" src="js/firebase-adapter.js"></script>
+<script type="module">
+const PRODUCTS = [{"id": "piso-tenedor-principal", "name": "Tenedor Principal", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": 45, "qty": 37, "source": "agosto"}, {"id": "piso-tenedor-fino-pescado", "name": "Tenedor fino (pescado)", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": null, "qty": 15, "source": "agosto"}, {"id": "piso-tenedores-extras", "name": "Tenedores extras", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": null, "qty": 32, "source": "agosto"}, {"id": "piso-cuchillo-principal", "name": "Cuchillo Principal", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": 45, "qty": 31, "source": "agosto"}, {"id": "piso-cuchillo-fino-pescado", "name": "Cuchillo fino (pescado)", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": null, "qty": 17, "source": "agosto"}, {"id": "piso-cuchillo-carne", "name": "Cuchillo Carne", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": null, "qty": 18, "source": "agosto"}, {"id": "piso-cuchillo-mantequilla", "name": "Cuchillo mantequilla", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": null, "qty": 32, "source": "agosto"}, {"id": "piso-cuchara-principal", "name": "Cuchara principal", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": 30, "qty": 40, "source": "agosto"}, {"id": "piso-cuchara-fina-pescado", "name": "Cuchara fina (pescado)", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": null, "qty": 19, "source": "agosto"}, {"id": "piso-cucharas-cocina", "name": "Cucharas Cocina", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": null, "qty": 27, "source": "agosto"}, {"id": "piso-cucharillas-salsas-cafe", "name": "Cucharillas salsas/cafe", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": null, "qty": 23, "source": "agosto"}, {"id": "piso-tijeras-pizza", "name": "Tijeras Pizza", "area": "piso", "categoria": "Cubiertos", "uso": null, "ideal": 15, "qty": 7, "source": "agosto"}, {"id": "barra-copa-flauta", "name": "Copa Flauta", "area": "barra", "categoria": "Vasos", "uso": "Champagne", "ideal": null, "qty": 61, "source": "agosto"}, {"id": "barra-shots-pequenos", "name": "Shots Pequeños", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 5, "source": "agosto"}, {"id": "barra-shots-grandes", "name": "Shots grandes", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 14, "source": "agosto"}, {"id": "barra-tumbler-grande", "name": "Tumbler Grande", "area": "barra", "categoria": "Vasos", "uso": "Micheladas", "ideal": null, "qty": 5, "source": "agosto"}, {"id": "barra-tumbler-pequeno", "name": "Tumbler Pequeño", "area": "barra", "categoria": "Vasos", "uso": "Agua", "ideal": null, "qty": 22, "source": "agosto"}, {"id": "barra-rocas", "name": "Rocas", "area": "barra", "categoria": "Vasos", "uso": "Agua", "ideal": null, "qty": 16, "source": "agosto"}, {"id": "barra-rocas-tallado", "name": "Rocas Tallado", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 4, "source": "agosto"}, {"id": "barra-rocas-rallado", "name": "Rocas Rallado", "area": "barra", "categoria": "Vasos", "uso": "Micelio", "ideal": null, "qty": 8, "source": "agosto"}, {"id": "barra-highball-tallado", "name": "Highball Tallado", "area": "barra", "categoria": "Vasos", "uso": "Mojito/cuba", "ideal": null, "qty": 3, "source": "agosto"}, {"id": "barra-highball-rallado", "name": "Highball Rallado", "area": "barra", "categoria": "Vasos", "uso": "Melaza", "ideal": null, "qty": 2, "source": "agosto"}, {"id": "barra-highball-liso", "name": "Highball Liso", "area": "barra", "categoria": "Vasos", "uso": "Tierra/Brasa", "ideal": null, "qty": 11, "source": "agosto"}, {"id": "barra-copa-nick-nora", "name": "Copa Nick & Nora", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 10, "source": "agosto"}, {"id": "barra-copa-coupe", "name": "Copa Coupe", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 11, "source": "agosto"}, {"id": "barra-copa-vino-blanco", "name": "Copa Vino Blanco", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 7, "source": "agosto"}, {"id": "barra-copa-vino-tinto", "name": "Copa Vino Tinto", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 10, "source": "agosto"}, {"id": "barra-copa-aperol-g-t", "name": "Copa Aperol/G&T", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 12, "source": "agosto"}, {"id": "barra-copa-balon", "name": "Copa Balón", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 6, "source": "agosto"}, {"id": "barra-copa-balon-roja", "name": "Copa Balón roja", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 1, "source": "agosto"}, {"id": "barra-frasco-jameson", "name": "Frasco Jameson", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 3, "source": "agosto"}, {"id": "barra-highball-refresco", "name": "Highball Refresco", "area": "barra", "categoria": "Vasos ", "uso": "Coca/Aguas", "ideal": null, "qty": 27, "source": "agosto"}, {"id": "barra-copa-degustacion", "name": "Copa Degustacion", "area": "barra", "categoria": "Vasos", "uso": null, "ideal": null, "qty": 3, "source": "agosto"}, {"id": "cocina-de-sitio", "name": "De Sitio", "area": "cocina", "categoria": "Platos", "uso": "Decorativo", "ideal": null, "qty": 43, "source": "ultimo"}, {"id": "cocina-pequeno-ceramica-bco", "name": "Pequeño cerámica bco", "area": "cocina", "categoria": "Platos", "uso": "P/compartir", "ideal": null, "qty": 22, "source": "ultimo"}, {"id": "cocina-hondo-ceramica-cafe", "name": "Hondo Cerámica café", "area": "cocina", "categoria": "Platos", "uso": null, "ideal": null, "qty": 8, "source": "ultimo"}, {"id": "cocina-pequeno-ceramica-cafe", "name": "Pequeño cerámica café", "area": "cocina", "categoria": "Platos", "uso": null, "ideal": null, "qty": 4, "source": "ultimo"}, {"id": "cocina-peltre-negro", "name": "Peltre negro", "area": "cocina", "categoria": "Platos", "uso": null, "ideal": null, "qty": 8, "source": "ultimo"}, {"id": "cocina-peltre-ovalado-blanco", "name": "Peltre ovalado blanco", "area": "cocina", "categoria": "Platos", "uso": null, "ideal": null, "qty": 7, "source": "ultimo"}, {"id": "cocina-peltre-bowl-blanco", "name": "Peltre Bowl blanco", "area": "cocina", "categoria": "Platos", "uso": null, "ideal": null, "qty": 6, "source": "ultimo"}, {"id": "cocina-peltre-sombrero", "name": "Peltre sombrero", "area": "cocina", "categoria": "Platos", "uso": null, "ideal": null, "qty": 23, "source": "ultimo"}, {"id": "cocina-grande-de-ceramica", "name": "Grande de Ceramica", "area": "cocina", "categoria": "Platos", "uso": null, "ideal": null, "qty": 8, "source": "ultimo"}, {"id": "cocina-bowl-postre", "name": "Bowl Postre", "area": "cocina", "categoria": "Platos", "uso": null, "ideal": null, "qty": 5, "source": "ultimo"}];
+const BASE_MONTH = '2026-08';
+const AREAS = ['cocina', 'barra', 'piso'];
+const LABEL = { cocina: 'Cocina', barra: 'Barra', piso: 'Piso' };
+let db, admin;
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+window.unlock = async function () {
+  const msg = document.getElementById('gate-msg');
+  msg.textContent = '';
+  try {
+    await window.__firebaseReady;
+    db = window.__firebaseDb;
+    const pin = document.getElementById('pin').value.trim();
+    const snap = await db.collection('staff').where('pin', '==', pin).where('active', '==', true).limit(1).get();
+    if (snap.empty || snap.docs[0].data().role !== 'admin') { msg.textContent = 'PIN incorrecto o sin permisos de administrador.'; return; }
+    admin = snap.docs[0].data();
+    document.getElementById('gate').style.display = 'none';
+    showPreview();
+  } catch (e) {
+    console.error(e);
+    msg.textContent = 'Error de conexión (' + (e.code || e.message) + ')';
+  }
+};
+
+function showPreview() {
+  let html = '';
+  for (const a of AREAS) {
+    const list = PRODUCTS.filter(p => p.area === a);
+    const rows = list.map(p =>
+      '<tr><td>' + esc(p.name) + (p.uso ? '<div class="uso">' + esc(p.uso) + '</div>' : '') + '</td><td class="num">' + p.qty + '</td></tr>'
+    ).join('');
+    html += '<div class="card imp-area"><h3>' + LABEL[a] + ' · ' + list.length + ' productos</h3>' +
+      '<table class="imp-table"><tr><td class="uso">Producto</td><td class="num uso">Cantidad</td></tr>' + rows + '</table></div>';
+  }
+  html += '<label class="check"><input type="checkbox" id="chk-base" checked><span>Cargar también estas cantidades como <b>conteo base (agosto 2026)</b>, ya aprobado, para que el primer conteo en la app se compare contra ellas. Si lo desmarcás, se carga solo el catálogo.</span></label>' +
+    '<button class="btn btn-primary" id="go" onclick="runImport()">Importar ' + PRODUCTS.length + ' productos</button>' +
+    '<div id="log" style="margin-top:18px"></div>';
+  const main = document.getElementById('main');
+  main.innerHTML = html;
+  main.style.display = 'block';
+}
+
+window.runImport = async function () {
+  const btn = document.getElementById('go');
+  const log = document.getElementById('log');
+  const withBase = document.getElementById('chk-base').checked;
+  btn.disabled = true;
+  const say = t => { log.textContent += t + '\n'; };
+  let created = 0, skipped = 0;
+  try {
+    for (const p of PRODUCTS) {
+      const ref = db.doc('products/' + p.id);
+      if ((await ref.get()).exists) { skipped++; continue; }
+      await ref.set({
+        name: p.name, area: p.area, status: 'approved', photoId: null,
+        categoria: p.categoria || null, uso: p.uso || null, ideal: p.ideal || null,
+        createdAt: new Date().toISOString(),
+      });
+      created++;
+    }
+    say('Productos: ' + created + ' creados, ' + skipped + ' ya existían.');
+
+    if (withBase) {
+      for (const a of AREAS) {
+        const prev = await db.collection('counts').where('area', '==', a).where('status', '==', 'approved').limit(1).get();
+        if (!prev.empty) { say('Conteo base ' + LABEL[a] + ': ya hay un conteo aprobado, no se toca.'); continue; }
+        const items = {};
+        PRODUCTS.filter(p => p.area === a).forEach(p => { items[p.id] = { qty: p.qty, previousQty: p.qty, reason: '' }; });
+        const now = new Date().toISOString();
+        await db.doc('counts/' + a + '_' + BASE_MONTH).set({
+          area: a, month: BASE_MONTH, status: 'approved', items,
+          submittedBy: 'Carga inicial (Excel)', submittedAt: now,
+          reviewedBy: admin.name, reviewedAt: now, createdAt: now,
+        });
+        say('Conteo base ' + LABEL[a] + ': cargado (' + Object.keys(items).length + ' productos).');
+      }
+    }
+    say('\nListo. Ya podés volver a la app. Te conviene borrar importar.html del repo cuando termines.');
+  } catch (e) {
+    console.error(e);
+    say('\nError: ' + (e.code || e.message) + '. Lo ya cargado queda guardado; podés reintentar sin duplicar.');
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>

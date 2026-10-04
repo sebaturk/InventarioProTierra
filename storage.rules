@@ -1,9 +1,8 @@
+// OBSOLETO — esta app ya NO usa Firebase Storage (ver README, sección de
+// Costos). Las fotos se guardan como base64 directo en Firestore para
+// evitar el requisito del plan Blaze. Dejo este archivo por si en el
+// futuro vuelven a necesitar Storage para adjuntos más pesados.
 rules_version = '2';
-
-// Las fotos se sirven públicamente sin token (para poder armar la URL
-// directamente desde el id guardado en Firestore). Solo un usuario
-// autenticado (aunque sea de forma anónima, como hace la app al abrir)
-// puede subir, y se limita el tamaño y el tipo de archivo.
 service firebase.storage {
   match /b/{bucket}/o {
     match /photos/{fileName} {
